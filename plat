@@ -1,0 +1,56 @@
+<?php
+
+public function platNumPaySelect() {
+	if(request()->isPost()) {
+		$input = input('param.');
+		logs($input,'paramValue');
+
+		$validate = new Validate([
+			'platNum'  => 'require|CarValid', //车牌号
+		],[
+			'platNum.CarValid' => '车牌号不合法'
+		]);
+		$validate->extend('CarValid', function ($value) {
+			return isCarLicense($value);
+		});
+		if ($validate->check($input)) {
+			
+			$msg_syntony = plat_open_select($input['platNum'],$this->GasType);
+
+			if($msg_syntony == 1) {
+				$data = ['status'=>1,'statusMsg'=>'已开通','platNum'=>$input['platNum']];
+				$p_where = [
+					'plat_num' => $input['platNum'],
+					'agent_id' => $user_info['agent_id'],
+					'camera_id'=>0];
+				$platnum = db('platnum')->where($p_where)->find();
+
+				if($platnum) {
+					$plat_data = [
+						'wg_status' => $msg_syntony,
+						'update_time' => time()
+					];
+					db('platnum')->where($p_where)->update($plat_data);
+				} else {
+					$plat_data = [
+						'camera_id'=>0,
+						'agent_id' => $user_info['agent_id'],
+						'plat_num' => $input['platNum'],
+						'source' => '终端',
+						'wg_status' => $msg_syntony,
+						'create_time' => time(),
+						'update_time' => time()
+					];
+					db('platnum')->insert($plat_data);
+				}
+			} else {
+				$data = ['status'=>2,'statusMsg'=>'未开通','platNum'=>$input['platNum']];
+			}
+			return logs(['code'=>1000,'msg'=>'请求成功','data'=>$data],'apiResult');
+
+		} else {
+			return logs(['code'=>2000,'msg'=>$validate->getError()],'apiResult');
+		}
+	}
+	return false;
+}
